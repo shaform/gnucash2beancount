@@ -1,0 +1,33 @@
+name: gnc2bcnt
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - babel=2.8.0
+  - beautifulsoup4=4.9.1
+  - bottle=0.12.18
+  - chardet=3.0.4
+  - cheroot=8.4.5
+  - click=7.1.2
+  - cython=0.29.21
+  - flask-babel=2.0.0
+  - flask=1.1.2
+  - google-api-python-client=1.11.0
+  - httplib2=0.18.1
+  - jinja2=2.11.2
+  - lxml=4.5.2
+  - markdown2=2.3.6
+  - oauth2client=4.1.3
+  - pip=20.2.2
+  - ply=3.11
+  - pytest=6.0.1
+  - python-dateutil=2.8.1
+  - python-magic=0.4.15
+  - python=3.7.7
+  - requests=2.24.0
+  - simplejson=3.17.2
+  - werkzeug=1.0.1
+  - pip:
+    - beancount==2.3.1
+    - doq==0.6.3
+    - fava==1.15
