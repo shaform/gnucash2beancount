@@ -1,9 +1,8 @@
 import argparse
 
-from beancount.parser import printer
-
 import gnucash
 from . import converter
+from . import printer
 
 
 def parse_args():
@@ -25,11 +24,7 @@ def main():
         print('Start conversion...')
         entries = gnc_converter.convert(currency=args.currency)
     with open(args.beancount_path, 'w') as outfile:
-        for entry in entries:
-            if isinstance(entry, str):
-                print(entry, file=outfile)
-            else:
-                printer.print_entry(entry, file=outfile)
+        printer.print_entries(entries, file=outfile)
     print('Done!')
 
 

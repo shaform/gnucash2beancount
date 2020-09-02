@@ -6,6 +6,7 @@ from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
 from beancount.core import data
 
 from . import gnucash_utils as gnc_utils
+from .printer import CostBasedPosting
 
 ACCOUNT_TYPES_MAP = {
     gnucash.ACCT_TYPE_ASSET: DEFAULT_ACCOUNT_TYPES.assets,
@@ -88,14 +89,27 @@ class Converter(object):
             acct = acct_map[gnc_acct.GetGUID().to_string()]
             units = data.Amount(Converter.normalize_numeric(gnc_amount),
                                 acct.currencies[0])
-            cost = price = split_flag = None
+            cost = split_flag = None
             if acct.currencies[0] != base_currency:
-                price = data.Amount(
-                    Converter.normalize_numeric(split.GetSharePrice()),
+                total_cost = data.Amount(
+                    abs(Converter.normalize_numeric(split.GetValue())),
                     base_currency)
-            postings.append(
-                data.Posting(acct.account, units, cost, price, split_flag,
-                             split_meta))
+                num_units = abs(gnc_amount.to_double())
+                if num_units == 0.:
+                    price = None
+                else:
+                    price = data.Amount(
+                        decimal.Decimal(
+                            float(split.GetValue().to_double()) /
+                            float(gnc_amount.to_double())), base_currency)
+                postings.append(
+                    CostBasedPosting(acct.account, units, cost, price,
+                                     total_cost, split_flag, split_meta))
+            else:
+                price = None
+                postings.append(
+                    data.Posting(acct.account, units, cost, price, split_flag,
+                                 split_meta))
         return data.Transaction(meta, date, flag, payee, narration, None, None,
                                 postings)
 
@@ -149,7 +163,10 @@ class Converter(object):
 
     def convert(self, currency):
         book = self.book
-        entries = ['option "operating_currency" "%s"\n' % currency]
+        entries = [
+            'option "operating_currency" "%s"' % currency,
+            'option "inferred_tolerance_default" "*:0.000001"',
+        ]
 
         txns = gnc_utils.get_all_transactions(book)
         first_date = txns[0].GetDate().strftime('%Y-%m-%d')
@@ -163,10 +180,10 @@ class Converter(object):
                                                     first_date)
 
         # add commodities
-        entries.append('* Commodities\n\n')
+        entries.append('* Commodities')
         entries.extend(commodities)
         # add accounts
-        entries.append('* Accounts\n\n')
+        entries.append('* Accounts')
         entries.extend(accts)
 
         # convert transactions
@@ -183,7 +200,7 @@ class Converter(object):
 
         for acct_name, postings in sorted(acct_txns.items(),
                                           key=lambda x: x[0]):
-            entries.append('** %s\n' % acct_name)
+            entries.append('** %s' % acct_name)
             entries.extend(postings)
 
         # TODO: handle prices

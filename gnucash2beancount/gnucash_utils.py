@@ -49,5 +49,9 @@ def get_main_account(txn):
 
     :param txn:
     """
-    main_split = txn.GetSplitList()[0]
+    main_currency = txn.GetCurrency().get_mnemonic()
+    main_split = [
+        sp for sp in txn.GetSplitList()
+        if sp.GetAccount().GetCommodity().get_mnemonic() == main_currency
+    ][0]
     return main_split.GetAccount()
