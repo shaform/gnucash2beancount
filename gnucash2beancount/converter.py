@@ -38,8 +38,8 @@ class Converter(object):
         name = account.get_full_name()
         full_name = name.replace('.', ':')
         full_name = re.sub(' +', '-', full_name)
-        full_name = full_name.replace('/', '-or-')
-        full_name = full_name.replace('@', '-at-')
+        full_name = re.sub('-*/-*', '-', full_name)
+        full_name = re.sub('-*@-*', '-at-', full_name)
 
         # shouldn't have invalid types
         acct_type = ACCOUNT_TYPES_MAP[account.GetType()]
@@ -90,9 +90,9 @@ class Converter(object):
                                 acct.currencies[0])
             cost = price = split_flag = None
             if acct.currencies[0] != base_currency:
-                cost = data.Cost(
-                    Converter.normalize_numeric(split.GetValue()),
-                    base_currency, None, None)
+                price = data.Amount(
+                    Converter.normalize_numeric(split.GetSharePrice()),
+                    base_currency)
             postings.append(
                 data.Posting(acct.account, units, cost, price, split_flag,
                              split_meta))
