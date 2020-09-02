@@ -85,33 +85,50 @@ class Converter(object):
             if memo:
                 split_meta['memo'] = memo
             gnc_acct = split.GetAccount()
+            is_currency = gnc_acct.GetCommodity().get_namespace() == 'CURRENCY'
             gnc_amount = split.GetAmount()
             acct = acct_map[gnc_acct.GetGUID().to_string()]
-            units = data.Amount(Converter.normalize_numeric(gnc_amount),
-                                acct.currencies[0])
-            cost = split_flag = None
+            amount = Converter.normalize_numeric(gnc_amount)
+            units = data.Amount(amount, acct.currencies[0])
+            split_flag = None
             if acct.currencies[0] != base_currency:
                 total_cost = data.Amount(
                     abs(Converter.normalize_numeric(split.GetValue())),
                     base_currency)
                 num_units = abs(gnc_amount.to_double())
                 if num_units == 0.:
-                    price = None
+                    cost = price = None
                 else:
                     price = data.Amount(
                         decimal.Decimal(
                             float(split.GetValue().to_double()) /
                             float(gnc_amount.to_double())), base_currency)
+                    if amount > 0 and not is_currency:
+                        cost = data.Cost(price, base_currency,
+                                         txn.GetDate().date(), None)
+                    else:
+                        cost = None
                 postings.append(
                     CostBasedPosting(acct.account, units, cost, price,
                                      total_cost, split_flag, split_meta))
             else:
-                price = None
+                cost = price = None
                 postings.append(
                     data.Posting(acct.account, units, cost, price, split_flag,
                                  split_meta))
         return data.Transaction(meta, date, flag, payee, narration, None, None,
                                 postings)
+
+    @staticmethod
+    def convert_price(name, currency, gnc_price):
+        meta = {}
+        v = gnc_price.get_value()
+        gv = gnucash.gnucash_business.GncNumeric(instance=v)
+        price = Converter.normalize_numeric(gv)
+        amount = data.Amount(price, currency)
+        date = gnc_price.get_time64().strftime('%Y-%m-%d')
+        return data.Price(meta, date, Converter.normalize_commodity(name),
+                          amount)
 
     @staticmethod
     def normalize_commodity(name):
@@ -140,11 +157,14 @@ class Converter(object):
     def collect_commodities(book, gnc_accts, date):
 
         used_commodities = set()
+        gnc_commodities = {}
         for acct in gnc_accts:
             gnc_commodity = acct.GetCommodity()
             ns = gnc_commodity.get_namespace()
             name = gnc_commodity.get_mnemonic()
-            used_commodities.add((ns, name))
+            if (ns, name) not in used_commodities:
+                used_commodities.add((ns, name))
+                gnc_commodities[name] = gnc_commodity
 
         tbl = book.get_table()
         commodities = []
@@ -159,7 +179,7 @@ class Converter(object):
                         'price': 'USD:yahoo/%s' % name
                     }
                     commodities.append(data.Commodity(meta, date, name))
-        return commodities
+        return commodities, gnc_commodities
 
     def convert(self, currency):
         book = self.book
@@ -176,8 +196,8 @@ class Converter(object):
         accts = [Converter.convert_account(gnc_acct) for gnc_acct in gnc_accts]
 
         # convert commodities
-        commodities = Converter.collect_commodities(book, gnc_accts,
-                                                    first_date)
+        commodities, gnc_commodities = Converter.collect_commodities(
+            book, gnc_accts, first_date)
 
         # add commodities
         entries.append('* Commodities')
@@ -203,6 +223,20 @@ class Converter(object):
             entries.append('** %s' % acct_name)
             entries.extend(postings)
 
-        # TODO: handle prices
+        # convert prices
+        entries.append('* Prices')
+        gnc_currency = gnc_commodities[currency]
+        price_db = book.get_price_db()
+        for name, gnc_commodity in sorted(gnc_commodities.items(),
+                                          key=lambda x: x[0]):
+            if gnc_commodity is gnc_currency:
+                continue
+            gnc_prices = price_db.get_prices(gnc_commodity, gnc_currency)
+            if not gnc_prices:
+                continue
+            entries.append('** %s' % name)
+            for gnc_price in sorted(gnc_prices, key=lambda x: x.get_time64()):
+                price = Converter.convert_price(name, currency, gnc_price)
+                entries.append(price)
 
         return entries
