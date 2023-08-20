@@ -106,6 +106,9 @@ class Converter(object):
                     if amount > 0 and not is_currency:
                         cost = data.Cost(price, base_currency,
                                          txn.GetDate().date(), None)
+                    elif amount < 0 and not is_currency:
+                        cost = data.Cost(price, base_currency,
+                                         None, None)
                     else:
                         cost = None
                 postings.append(
@@ -193,6 +196,7 @@ class Converter(object):
         entries = [
             'option "operating_currency" "%s"' % currency,
             'option "inferred_tolerance_default" "*:0.000001"',
+            'option "booking_method" "FIFO"',
         ]
 
         txns = gnc_utils.get_all_transactions(book)
