@@ -79,6 +79,7 @@ class Converter(object):
         base_currency = txn.GetCurrency().get_mnemonic()
 
         postings = []
+        assets_sold = False
         for split in txn.GetSplitList():
             split_meta = {}
             memo = split.GetMemo()
@@ -109,6 +110,7 @@ class Converter(object):
                     elif amount < 0 and not is_currency:
                         cost = data.Cost(price, base_currency,
                                          None, None)
+                        assets_sold = True
                     else:
                         cost = None
                 postings.append(
@@ -119,6 +121,8 @@ class Converter(object):
                 postings.append(
                     data.Posting(acct.account, units, cost, price, split_flag,
                                  split_meta))
+        if assets_sold:
+            postings.append(data.Posting("Income:Trade:PnL", None, None, None, None, None))
         return data.Transaction(meta, date, flag, payee, narration, None, None,
                                 postings)
 
@@ -216,6 +220,7 @@ class Converter(object):
         # add accounts
         entries.append('* Accounts')
         entries.extend(accts)
+        entries.append(data.Open(None, first_date, "Income:Trade:PnL", [currency], None))
 
         # convert transactions
         acct_map = {
