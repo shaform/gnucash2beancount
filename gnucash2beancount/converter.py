@@ -132,7 +132,14 @@ class Converter(object):
 
     @staticmethod
     def normalize_commodity(name):
-        return re.sub('[0-9]', 'X', name)
+        assert len(name) >= 1
+        if len(name) == 1:
+            name = "X" + name
+        if name[0] >= "0" and name[0] <= "9":
+            name = "X" + name
+        if name[-1] >= "0" and name[-1] <= "9":
+            name = name + "X"
+        return name
 
     @staticmethod
     def normalize_numeric(num):
